@@ -21,8 +21,15 @@ RUBY=${RUBY:-ruby}
 GEM=${GEM:-gem}
 CACHE_DIR=${CACHE_DIR:-".rubydeps"}
 
-set -e
+#set -e
 cd "$(dirname ${BASH_SOURCE[0]})"
+
+echo "This is a temporary change to find out the hugo version on buildbot:"
+hugo version
+
+wget https://github.com/gohugoio/hugo/releases/download/v0.80.0/hugo_0.80.0_Linux-64bit.tar.gz
+tar xf hugo_0.80.0_Linux-64bit.tar.gz
+./hugo version
 
 DIR="`pwd`"
 
