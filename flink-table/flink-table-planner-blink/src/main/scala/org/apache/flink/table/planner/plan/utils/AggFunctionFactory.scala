@@ -52,7 +52,8 @@ import scala.collection.JavaConversions._
 class AggFunctionFactory(
     inputRowType: RowType,
     orderKeyIndexes: Array[Int],
-    aggCallNeedRetractions: Array[Boolean]) {
+    aggCallNeedRetractions: Array[Boolean],
+    isBounded: Boolean) {
 
   /**
     * The entry point to create an aggregate function from the given [[AggregateCall]].
@@ -94,8 +95,12 @@ class AggFunctionFactory(
       case a: SqlRankFunction if a.getKind == SqlKind.DENSE_RANK =>
         createDenseRankAggFunction(argTypes)
 
-      case _: SqlLeadLagAggFunction =>
-        createLeadLagAggFunction(argTypes, index)
+      case func: SqlLeadLagAggFunction =>
+        if (isBounded) {
+          createBatchLeadLagAggFunction(argTypes, index)
+        } else {
+          createStreamLeadLagAggFunction(func, argTypes, index)
+        }
 
       case _: SqlSingleValueAggFunction =>
         createSingleValueAggFunction(argTypes)
@@ -328,7 +333,22 @@ class AggFunctionFactory(
     }
   }
 
-  private def createLeadLagAggFunction(
+  private def createStreamLeadLagAggFunction(
+      func: SqlLeadLagAggFunction,
+      argTypes: Array[LogicalType],
+      index: Int): UserDefinedFunction = {
+    if (func.getKind == SqlKind.LEAD) {
+      throw new TableException("LEAD Function is not supported in stream mode.")
+    }
+
+    if (aggCallNeedRetractions(index)) {
+      throw new TableException("LAG Function with retraction is not supported in stream mode.")
+    }
+
+    new LagAggFunction(argTypes)
+  }
+
+  private def createBatchLeadLagAggFunction(
       argTypes: Array[LogicalType], index: Int): UserDefinedFunction = {
     argTypes(0).getTypeRoot match {
       case TINYINT =>
